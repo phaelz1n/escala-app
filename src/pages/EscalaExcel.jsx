@@ -55,7 +55,7 @@ function EditableCell({ value, onChange, placeholder = '—', className = '' }) 
     <span
       onClick={() => { setVal(value||''); setEditing(true); }}
       title="Clique para editar"
-      className={`cursor-pointer hover:bg-slate-600/40 px-1.5 py-1 rounded transition-colors block truncate text-xs ${
+      className={`cursor-pointer hover:bg-slate-600/40 px-1.5 py-1 rounded transition-colors block whitespace-normal break-words leading-tight text-xs ${
         value ? 'text-slate-200' : 'text-slate-600'
       } ${className}`}
     >
@@ -75,16 +75,29 @@ function LinhaRow({ linha, days, drivers, selYear, selMonth, todayDay, isCurrent
 
   return (
     <tr className="border-b border-slate-700/30 hover:bg-slate-800/40 group">
+      {/* Delete (Moved to front for easier access) */}
+      <td className="sticky left-0 z-10 bg-slate-900 border-r border-slate-700/50 px-1 py-1.5 min-w-[40px] max-w-[40px] no-print">
+        {confirmDelete ? (
+          <div className="flex flex-col gap-1 items-center">
+            <button onClick={() => onDelete(linha.id)} className="text-red-400 hover:text-red-300 text-[10px] px-1 py-0.5 border border-red-400/40 rounded">OK</button>
+            <button onClick={() => setConfirmDelete(false)} className="text-slate-400 text-[10px] px-1 py-0.5 border border-slate-600 rounded">X</button>
+          </div>
+        ) : (
+          <button onClick={() => setConfirmDelete(true)} className="opacity-0 group-hover:opacity-100 text-slate-500 hover:text-red-400 transition-all flex justify-center w-full">
+            <Trash2 size={14} />
+          </button>
+        )}
+      </td>
       {/* Linha info cols */}
-      <td className="sticky left-0 z-10 bg-slate-900 border-r border-slate-700/50 px-2 py-1.5 min-w-[130px]">
+      <td className="sticky left-[40px] z-10 bg-slate-900 border-r border-slate-700/50 px-2 py-1.5 min-w-[130px]">
         <div className="flex items-center gap-1">
           <EditableCell value={linha.empresa} onChange={v => onUpdate(linha.id, { empresa: v })} placeholder="Empresa" />
         </div>
       </td>
-      <td className="sticky left-[130px] z-10 bg-slate-900 border-r border-slate-700/50 px-2 py-1.5 min-w-[60px]">
+      <td className="sticky left-[170px] z-10 bg-slate-900 border-r border-slate-700/50 px-2 py-1.5 min-w-[60px]">
         <EditableCell value={linha.horario} onChange={v => onUpdate(linha.id, { horario: v })} placeholder="HH:MM" />
       </td>
-      <td className="sticky left-[190px] z-10 bg-slate-900 border-r border-slate-700/50 px-2 py-1.5 min-w-[180px] max-w-[180px]">
+      <td className="sticky left-[230px] z-10 bg-slate-900 border-r border-slate-700/50 px-2 py-1.5 min-w-[280px]">
         <EditableCell value={linha.descricao || linha.lineCode} onChange={v => onUpdate(linha.id, { descricao: v })} placeholder="Descrição da linha" />
       </td>
       <td className="border-r border-slate-700/50 px-2 py-1.5 min-w-[110px]">
@@ -132,20 +145,6 @@ function LinhaRow({ linha, days, drivers, selYear, selMonth, todayDay, isCurrent
           </td>
         );
       })}
-
-      {/* Delete */}
-      <td className="px-2 py-1.5 no-print">
-        {confirmDelete ? (
-          <div className="flex gap-1">
-            <button onClick={() => onDelete(linha.id)} className="text-red-400 hover:text-red-300 text-xs px-1.5 py-0.5 border border-red-400/40 rounded">OK</button>
-            <button onClick={() => setConfirmDelete(false)} className="text-slate-400 text-xs px-1.5 py-0.5 border border-slate-600 rounded"><X size={10}/></button>
-          </div>
-        ) : (
-          <button onClick={() => setConfirmDelete(true)} className="opacity-0 group-hover:opacity-100 text-slate-500 hover:text-red-400 transition-all">
-            <Trash2 size={14} />
-          </button>
-        )}
-      </td>
     </tr>
   );
 }
@@ -389,9 +388,10 @@ export default function EscalaExcel() {
           <table className="border-collapse text-xs w-full" style={{ minWidth: `${370 + days.length * 90}px` }}>
             <thead className="sticky top-0 z-20">
               <tr className="bg-slate-900 border-b-2 border-slate-700">
-                <th className="sticky left-0 z-30 bg-slate-900 border-r border-slate-700 px-3 py-2.5 text-left text-slate-400 font-semibold uppercase tracking-wide min-w-[130px]">Empresa</th>
-                <th className="sticky left-[130px] z-30 bg-slate-900 border-r border-slate-700 px-2 py-2.5 text-left text-slate-400 font-semibold uppercase tracking-wide min-w-[60px]">Hora</th>
-                <th className="sticky left-[190px] z-30 bg-slate-900 border-r border-slate-700 px-2 py-2.5 text-left text-slate-400 font-semibold uppercase tracking-wide min-w-[180px]">Linha / Descrição</th>
+                <th className="sticky left-0 z-30 bg-slate-900 border-r border-slate-700 px-1 py-2.5 min-w-[40px] max-w-[40px] no-print"></th>
+                <th className="sticky left-[40px] z-30 bg-slate-900 border-r border-slate-700 px-3 py-2.5 text-left text-slate-400 font-semibold uppercase tracking-wide min-w-[130px]">Empresa</th>
+                <th className="sticky left-[170px] z-30 bg-slate-900 border-r border-slate-700 px-2 py-2.5 text-left text-slate-400 font-semibold uppercase tracking-wide min-w-[60px]">Hora</th>
+                <th className="sticky left-[230px] z-30 bg-slate-900 border-r border-slate-700 px-2 py-2.5 text-left text-slate-400 font-semibold uppercase tracking-wide min-w-[280px]">Linha / Descrição</th>
                 <th className="border-r border-slate-700 px-2 py-2.5 text-left text-slate-400 font-semibold uppercase tracking-wide min-w-[110px]">Titular</th>
                 {days.map(d => {
                   const dateObj = new Date(selYear, selMonth, d);
@@ -416,7 +416,6 @@ export default function EscalaExcel() {
                     </th>
                   );
                 })}
-                <th className="px-2 py-2.5 no-print" />
               </tr>
             </thead>
             <tbody>
