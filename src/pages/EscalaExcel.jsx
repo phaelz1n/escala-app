@@ -118,22 +118,36 @@ function HeaderMenu({ title, colKey, activeMenu, setActiveMenu, sortConfigs, set
   
   const toggleValue = (val) => {
     setColumnFilters(prev => {
-      const current = prev[colKey] || [];
-      const isSelected = current.includes(val);
-      const updated = isSelected ? current.filter(v => v !== val) : [...current, val];
+      const current = prev[colKey]; // undefined means ALL are selected
+      let updated;
+      
+      if (!current) {
+        // "Select all" is active. So we check everything EXCEPT the one clicked
+        updated = uniqueValues.filter(v => v !== val);
+      } else {
+        const isSelected = current.includes(val);
+        updated = isSelected ? current.filter(v => v !== val) : [...current, val];
+      }
       
       const newFilters = { ...prev, [colKey]: updated };
-      if (updated.length === 0) delete newFilters[colKey];
+      if (updated.length === uniqueValues.length) delete newFilters[colKey]; // back to all
       return newFilters;
     });
   };
 
   const toggleAll = () => {
-    if (selectedValues.length === uniqueValues.length || selectedValues.length === 0) {
-      setColumnFilters(prev => { const n = {...prev}; delete n[colKey]; return n; });
-    } else {
-      setColumnFilters(prev => { const n = {...prev}; delete n[colKey]; return n; });
-    }
+    setColumnFilters(prev => {
+      const current = prev[colKey];
+      const newFilters = { ...prev };
+      if (!current) {
+        // Currently all selected, so change to NONE selected
+        newFilters[colKey] = [];
+      } else {
+        // Currently some/none selected, change to ALL selected
+        delete newFilters[colKey];
+      }
+      return newFilters;
+    });
   };
 
   const filteredValues = uniqueValues.filter(v => (v||'').toLowerCase().includes(search.toLowerCase()));
@@ -166,15 +180,18 @@ function HeaderMenu({ title, colKey, activeMenu, setActiveMenu, sortConfigs, set
           
           <div className="max-h-40 overflow-y-auto space-y-1 text-left">
             <label className="flex items-center gap-2 px-2 py-1 hover:bg-slate-700 rounded cursor-pointer text-xs">
-              <input type="checkbox" checked={selectedValues.length === 0} onChange={toggleAll} className="rounded bg-slate-700 border-slate-600" />
+              <input type="checkbox" checked={!columnFilters[colKey]} onChange={toggleAll} className="rounded bg-slate-700 border-slate-600" />
               <span>(Selecionar Tudo)</span>
             </label>
-            {filteredValues.map(val => (
-              <label key={val} className="flex items-center gap-2 px-2 py-1 hover:bg-slate-700 rounded cursor-pointer text-xs">
-                <input type="checkbox" checked={selectedValues.length === 0 || selectedValues.includes(val)} onChange={() => toggleValue(val)} className="rounded bg-slate-700 border-slate-600 text-blue-500" />
-                <span className="truncate">{val || '(Vazios)'}</span>
-              </label>
-            ))}
+            {filteredValues.map(val => {
+              const isChecked = !columnFilters[colKey] || columnFilters[colKey].includes(val);
+              return (
+                <label key={val} className="flex items-center gap-2 px-2 py-1 hover:bg-slate-700 rounded cursor-pointer text-xs">
+                  <input type="checkbox" checked={isChecked} onChange={() => toggleValue(val)} className="rounded bg-slate-700 border-slate-600 text-blue-500" />
+                  <span className="truncate">{val || '(Vazios)'}</span>
+                </label>
+              );
+            })}
           </div>
         </div>
       )}
@@ -344,7 +361,8 @@ export default function EscalaExcel() {
 
       // 1. Column Filters (Menu Checkboxes)
       for (const [key, selectedVals] of Object.entries(columnFilters)) {
-        if (!selectedVals || selectedVals.length === 0) continue;
+        if (!selectedVals) continue; // undefined means all are selected
+        if (selectedVals.length === 0) return false; // empty array means nothing is selected
         
         let val = '';
         if (key === 'empresa') val = l.empresa;
