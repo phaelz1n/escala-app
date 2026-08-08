@@ -48,9 +48,9 @@ function DriverModal({ driver, onSave, onClose }) {
               className="w-full bg-slate-700/50 border border-slate-600/50 text-slate-200 text-sm rounded-xl px-3 py-2.5 outline-none focus:border-blue-500/60 transition-colors"/>
           </div>
           <div>
-            <label className="text-slate-400 text-xs font-medium block mb-1.5">Telefone *</label>
+            <label className="text-slate-400 text-xs font-medium block mb-1.5">Telefone</label>
             <input value={form.phone} onChange={e => setForm(p=>({...p, phone: e.target.value}))}
-              required placeholder="51999999999"
+              placeholder="51999999999 (Opcional)"
               className="w-full bg-slate-700/50 border border-slate-600/50 text-slate-200 text-sm rounded-xl px-3 py-2.5 outline-none focus:border-blue-500/60 transition-colors"/>
           </div>
           <div className="grid grid-cols-2 gap-3">
