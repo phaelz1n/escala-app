@@ -63,7 +63,7 @@ function EditableCell({ value, onChange, placeholder = '—', className = '', li
     <span
       onClick={() => { setVal(value||''); setEditing(true); }}
       title="Clique para editar"
-      className={`cursor-pointer hover:bg-slate-600/40 px-1.5 py-1 rounded transition-colors block w-full truncate min-h-[24px] ${!value ? 'text-slate-500 italic' : ''} ${className}`}
+      className={`cursor-pointer hover:bg-slate-600/40 px-1.5 py-1 rounded transition-colors block w-full whitespace-normal break-words leading-tight min-h-[24px] ${!value ? 'text-slate-500 italic' : ''} ${className}`}
     >
       {value || placeholder}
     </span>
