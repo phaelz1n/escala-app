@@ -253,6 +253,12 @@ export default function EscalaExcel() {
       if (sortBy === 'descricao') {
         return (a.descricao || a.lineCode || '').localeCompare(b.descricao || b.lineCode || '');
       }
+      if (sortBy.startsWith('dia_')) {
+        const day = sortBy.split('_')[1];
+        const aVal = (a.dias?.[`d${day}`] || '').toUpperCase();
+        const bVal = (b.dias?.[`d${day}`] || '').toUpperCase();
+        return aVal.localeCompare(bVal);
+      }
       // default: horario
       const getVal = (t) => {
         if (!t) return 0;
@@ -448,7 +454,8 @@ export default function EscalaExcel() {
                   return (
                     <th
                       key={d}
-                      className={`border-r border-slate-700/50 px-1 py-2.5 text-center font-semibold min-w-[90px] ${
+                      onClick={() => setSortBy(`dia_${d}`)}
+                      className={`border-r border-slate-700/50 px-1 py-2.5 text-center font-semibold min-w-[90px] cursor-pointer hover:bg-slate-800 transition-colors ${
                         isToday
                           ? 'text-blue-400 bg-blue-500/10'
                           : isWeekend 
@@ -456,7 +463,10 @@ export default function EscalaExcel() {
                             : 'text-slate-300'
                       }`}
                     >
-                      <div>{d}</div>
+                      <div className="flex items-center justify-center gap-1">
+                        {d}
+                        {sortBy === `dia_${d}` && <span className="text-blue-400">↓</span>}
+                      </div>
                       <div className={`font-normal text-[10px] ${isWeekend ? 'text-slate-500' : 'text-slate-400'}`}>
                         {['Dom','Seg','Ter','Qua','Qui','Sex','Sáb'][dateObj.getDay()]}
                       </div>
