@@ -8,7 +8,7 @@ import { useApp } from '../context/AppContext';
 import PrintButton from '../components/PrintButton';
 import {
   Plus, Trash2, Save, X, ChevronLeft, ChevronRight,
-  AlertTriangle, Search, Filter, RefreshCw,
+  AlertTriangle, Search, Filter, RefreshCw, ChevronUp, ChevronDown
 } from 'lucide-react';
 
 const MESES = [
@@ -23,31 +23,38 @@ const STATUS_CELL = {
   'Descoberto':        'bg-red-500/20 text-red-300',
   'Substituído':       'bg-blue-500/20 text-blue-300',
   'Férias/Substituído':'bg-purple-500/20 text-purple-300',
-  'default':           'bg-slate-700/40 text-slate-300',
+  'default':           'bg-slate-700/40'
 };
 
-// ─── Célula editável ───────────────────────────────────────────────────────────
 function EditableCell({ value, onChange, placeholder = '—', className = '', listId }) {
   const [editing, setEditing] = useState(false);
-  const [val, setVal] = useState(value || '');
-  const inputRef = useRef(null);
+  const [val, setVal] = useState(value);
 
-  const commit = () => {
+  useEffect(() => setVal(value), [value]);
+
+  const handleBlur = () => {
     setEditing(false);
     if (val !== value) onChange(val);
+  };
+
+  const handleKeyDown = (e) => {
+    if (e.key === 'Enter') handleBlur();
+    if (e.key === 'Escape') {
+      setVal(value);
+      setEditing(false);
+    }
   };
 
   if (editing) {
     return (
       <input
-        ref={inputRef}
         autoFocus
-        value={val}
+        value={val || ''}
         onChange={e => setVal(e.target.value)}
-        onBlur={commit}
-        onKeyDown={e => { if (e.key === 'Enter') commit(); if (e.key === 'Escape') { setVal(value||''); setEditing(false); } }}
+        onBlur={handleBlur}
+        onKeyDown={handleKeyDown}
         list={listId}
-        className="w-full bg-blue-500/20 border border-blue-400 text-white text-xs px-1.5 py-1 rounded outline-none min-w-16"
+        className={`w-full bg-slate-800 text-white px-1.5 py-1 outline-none border border-blue-500 rounded text-xs ${className}`}
       />
     );
   }
@@ -56,12 +63,118 @@ function EditableCell({ value, onChange, placeholder = '—', className = '', li
     <span
       onClick={() => { setVal(value||''); setEditing(true); }}
       title="Clique para editar"
-      className={`cursor-pointer hover:bg-slate-600/40 px-1.5 py-1 rounded transition-colors block whitespace-normal break-words leading-tight text-xs ${
-        value ? 'text-slate-200' : 'text-slate-600'
-      } ${className}`}
+      className={`cursor-pointer hover:bg-slate-600/40 px-1.5 py-1 rounded transition-colors block w-full truncate min-h-[24px] ${!value ? 'text-slate-500 italic' : ''} ${className}`}
     >
       {value || placeholder}
     </span>
+  );
+}
+
+// ─── Componente HeaderMenu (Estilo Excel) ────────────────────────────────────
+function HeaderMenu({ title, colKey, activeMenu, setActiveMenu, sortConfigs, setSortConfigs, columnFilters, setColumnFilters, linhas, getVal, extraClass = "" }) {
+  const isOpen = activeMenu === colKey;
+  const [search, setSearch] = useState('');
+
+  // Close when clicking outside
+  useEffect(() => {
+    if (!isOpen) return;
+    const handleClick = (e) => {
+      if (!e.target.closest(`.header-menu-${colKey}`)) {
+        setActiveMenu(null);
+      }
+    };
+    document.addEventListener('mousedown', handleClick);
+    return () => document.removeEventListener('mousedown', handleClick);
+  }, [isOpen, colKey, setActiveMenu]);
+
+  // Compute unique values only when open
+  const uniqueValues = useMemo(() => {
+    if (!isOpen) return [];
+    const vals = new Set();
+    linhas.forEach(l => {
+      const v = getVal(l);
+      if (v) vals.add(v);
+    });
+    return Array.from(vals).sort((a, b) => (String(a)).localeCompare(String(b)));
+  }, [isOpen, linhas, getVal]);
+
+  const sortIndex = sortConfigs.findIndex(s => s.key === colKey);
+  const currentSort = sortIndex >= 0 ? sortConfigs[sortIndex] : null;
+
+  const handleSort = (dir) => {
+    setSortConfigs(prev => {
+      const filtered = prev.filter(s => s.key !== colKey);
+      if (currentSort?.direction === dir) return filtered; // toggle off
+      return [{ key: colKey, direction: dir }, ...filtered];
+    });
+    setActiveMenu(null);
+  };
+
+  const selectedValues = columnFilters[colKey] || [];
+  
+  const toggleValue = (val) => {
+    setColumnFilters(prev => {
+      const current = prev[colKey] || [];
+      const isSelected = current.includes(val);
+      const updated = isSelected ? current.filter(v => v !== val) : [...current, val];
+      
+      const newFilters = { ...prev, [colKey]: updated };
+      if (updated.length === 0) delete newFilters[colKey];
+      return newFilters;
+    });
+  };
+
+  const toggleAll = () => {
+    if (selectedValues.length === uniqueValues.length || selectedValues.length === 0) {
+      setColumnFilters(prev => { const n = {...prev}; delete n[colKey]; return n; });
+    } else {
+      setColumnFilters(prev => { const n = {...prev}; delete n[colKey]; return n; });
+    }
+  };
+
+  const filteredValues = uniqueValues.filter(v => (v||'').toLowerCase().includes(search.toLowerCase()));
+
+  return (
+    <div className={`relative header-menu-${colKey} flex items-center justify-center gap-1 cursor-pointer hover:text-white transition-colors select-none w-full h-full ${extraClass}`} onClick={() => !isOpen && setActiveMenu(colKey)}>
+      <div className="flex items-center gap-1">
+        {title}
+        {currentSort && <span className="text-blue-400 text-[10px]">{currentSort.direction === 'asc' ? '▲' : '▼'}{sortConfigs.length > 1 ? sortIndex + 1 : ''}</span>}
+        {selectedValues.length > 0 && <Filter size={10} className="text-emerald-400" />}
+      </div>
+      
+      {isOpen && (
+        <div className="absolute top-full left-0 mt-2 w-56 bg-slate-800 border border-slate-600 rounded-xl shadow-2xl z-[100] text-sm text-slate-200 p-2 cursor-default font-normal normal-case" onClick={e => e.stopPropagation()}>
+          <div className="space-y-1 mb-2">
+            <button onClick={() => handleSort('asc')} className={`w-full text-left px-3 py-1.5 rounded-lg hover:bg-slate-700 flex items-center justify-between ${currentSort?.direction === 'asc' ? 'bg-slate-700 text-blue-400' : ''}`}>
+              <span>Classificar de A a Z</span> <ChevronUp size={14}/>
+            </button>
+            <button onClick={() => handleSort('desc')} className={`w-full text-left px-3 py-1.5 rounded-lg hover:bg-slate-700 flex items-center justify-between ${currentSort?.direction === 'desc' ? 'bg-slate-700 text-blue-400' : ''}`}>
+              <span>Classificar de Z a A</span> <ChevronDown size={14}/>
+            </button>
+          </div>
+          
+          <div className="h-px bg-slate-700 my-2"></div>
+          
+          <div className="flex items-center gap-2 bg-slate-900 border border-slate-700 rounded-lg px-2 py-1.5 mb-2">
+            <Search size={14} className="text-slate-400" />
+            <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Pesquisar..." className="bg-transparent text-xs outline-none w-full" autoFocus />
+          </div>
+          
+          <div className="max-h-40 overflow-y-auto space-y-1 text-left">
+            <label className="flex items-center gap-2 px-2 py-1 hover:bg-slate-700 rounded cursor-pointer text-xs">
+              <input type="checkbox" checked={selectedValues.length === 0} onChange={toggleAll} className="rounded bg-slate-700 border-slate-600" />
+              <span>(Selecionar Tudo)</span>
+            </label>
+            {filteredValues.map(val => (
+              <label key={val} className="flex items-center gap-2 px-2 py-1 hover:bg-slate-700 rounded cursor-pointer text-xs">
+                <input type="checkbox" checked={selectedValues.length === 0 || selectedValues.includes(val)} onChange={() => toggleValue(val)} className="rounded bg-slate-700 border-slate-600 text-blue-500" />
+                <span className="truncate">{val}</span>
+              </label>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
   );
 }
 
@@ -162,15 +275,16 @@ export default function EscalaExcel() {
   const [selMonth, setSelMonth] = useState(now.getMonth());
   const [selYear,  setSelYear]  = useState(now.getFullYear());
   const [searchDesc, setSearchDesc] = useState('');
-  const [filterEmpresa, setFilterEmpresa] = useState('');
-  const [filterMotorista, setFilterMotorista] = useState('');
   const [hideEmpty, setHideEmpty] = useState(false);
   const [printDay, setPrintDay] = useState(todayDay);
   
   const [filterTurno, setFilterTurno] = useState('');
-  const [sortBy, setSortBy]           = useState('horario');
   const [showAddRow, setShowAddRow]   = useState(false);
   const [newLinha, setNewLinha] = useState({ empresa: '', horario: '', descricao: '', turno: 'Noite', pontoInicio: 'Garagem' });
+
+  const [sortConfigs, setSortConfigs] = useState([]);
+  const [columnFilters, setColumnFilters] = useState({});
+  const [activeMenu, setActiveMenu] = useState(null);
 
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 50;
@@ -225,56 +339,74 @@ export default function EscalaExcel() {
         if (creationDate > viewDate) return false;
       }
 
-      // 1. Empresa
-      if (filterEmpresa && l.empresa !== filterEmpresa) return false;
+      // 1. Column Filters (Menu Checkboxes)
+      for (const [key, selectedVals] of Object.entries(columnFilters)) {
+        if (!selectedVals || selectedVals.length === 0) continue;
+        
+        let val = '';
+        if (key === 'empresa') val = l.empresa;
+        else if (key === 'motorista') val = l.motoristaTitularName;
+        else if (key === 'descricao') val = l.descricao;
+        else if (key === 'horario') val = l.horario;
+        else if (key.startsWith('dia_')) {
+          const day = key.split('_')[1];
+          val = l.dias?.[`d${day}`];
+        }
+        
+        const stringVal = val || '';
+        if (!selectedVals.includes(stringVal)) return false;
+      }
       
-      // 2. Motorista Titular
-      if (filterMotorista && l.motoristaTitularName !== filterMotorista) return false;
-      
-      // 3. Descrição
+      // 2. Descrição (busca rápida)
       const q = searchDesc.toLowerCase();
       if (q && !l.descricao?.toLowerCase().includes(q)) return false;
       
-      // 4. Turno
+      // 3. Turno
       if (filterTurno && l.turno !== filterTurno) return false;
       
-      // 5. Hide Empty (oculta se não tem motorista titular, ou no print pode ter lógica especial, mas a UI quer esconder se a linha em si não tem)
+      // 4. Hide Empty (oculta se não tem motorista titular, ou no print pode ter lógica especial, mas a UI quer esconder se a linha em si não tem)
       // Ocultar Sem Motorista: Se ativado, esconde as linhas que não tem titular.
       if (hideEmpty && !l.motoristaTitularName) return false;
 
       return true;
     }).sort((a, b) => {
-      if (sortBy === 'empresa') {
-        return (a.empresa || '').localeCompare(b.empresa || '');
+      // Apply multi-level sorts
+      for (const config of sortConfigs) {
+        const { key, direction } = config;
+        let cmp = 0;
+
+        if (key === 'empresa') {
+          cmp = (a.empresa || '').localeCompare(b.empresa || '');
+        } else if (key === 'motorista') {
+          cmp = (a.motoristaTitularName || '').localeCompare(b.motoristaTitularName || '');
+        } else if (key === 'descricao') {
+          cmp = (a.descricao || a.lineCode || '').localeCompare(b.descricao || b.lineCode || '');
+        } else if (key.startsWith('dia_')) {
+          const day = key.split('_')[1];
+          const aVal = (a.dias?.[`d${day}`] || '').toUpperCase();
+          const bVal = (b.dias?.[`d${day}`] || '').toUpperCase();
+          cmp = aVal.localeCompare(bVal);
+        } else if (key === 'horario') {
+          const getVal = (t) => {
+            if (!t) return 0;
+            let [h, m] = t.split(':').map(Number);
+            if (isNaN(h)) return 0;
+            if (h < 3 || (h === 3 && m === 0)) h += 24; // Treat 00:00 to 03:00 as the end of the day
+            return h * 60 + (m || 0);
+          };
+          cmp = getVal(a.horario) - getVal(b.horario);
+        }
+
+        if (cmp !== 0) return direction === 'asc' ? cmp : -cmp;
       }
-      if (sortBy === 'motorista') {
-        return (a.motoristaTitularName || '').localeCompare(b.motoristaTitularName || '');
-      }
-      if (sortBy === 'descricao') {
-        return (a.descricao || a.lineCode || '').localeCompare(b.descricao || b.lineCode || '');
-      }
-      if (sortBy.startsWith('dia_')) {
-        const day = sortBy.split('_')[1];
-        const aVal = (a.dias?.[`d${day}`] || '').toUpperCase();
-        const bVal = (b.dias?.[`d${day}`] || '').toUpperCase();
-        return aVal.localeCompare(bVal);
-      }
-      // default: horario
-      const getVal = (t) => {
-        if (!t) return 0;
-        let [h, m] = t.split(':').map(Number);
-        if (isNaN(h)) return 0;
-        if (h < 3 || (h === 3 && m === 0)) h += 24; // Treat 00:00 to 03:00 as the end of the day
-        return h * 60 + (m || 0);
-      };
-      return getVal(a.horario) - getVal(b.horario);
+      return 0; // They are equal on all sorted columns
     });
-  }, [linhas, filterEmpresa, filterMotorista, searchDesc, filterTurno, hideEmpty, selMonth, selYear, sortBy]);
+  }, [linhas, columnFilters, searchDesc, filterTurno, hideEmpty, selMonth, selYear, sortConfigs]);
 
   // Reset pagination when filters change
   useEffect(() => {
     setCurrentPage(1);
-  }, [filterEmpresa, filterMotorista, searchDesc, filterTurno, hideEmpty, selMonth, selYear, sortBy]);
+  }, [columnFilters, searchDesc, filterTurno, hideEmpty, selMonth, selYear, sortConfigs]);
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / itemsPerPage));
   const paginated = filtered.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
@@ -344,21 +476,7 @@ export default function EscalaExcel() {
         </div>
 
         <div className="flex gap-3 w-full flex-wrap">
-          {/* Empresa */}
-          <select value={filterEmpresa} onChange={e => setFilterEmpresa(e.target.value)}
-            className="flex-1 min-w-32 bg-slate-800/60 border border-slate-700/50 text-slate-300 text-sm rounded-xl px-3 py-2 outline-none">
-            <option value="">Todas as Empresas</option>
-            {empresasUnicas.map(e => <option key={e}>{e}</option>)}
-          </select>
-
-          {/* Motorista */}
-          <select value={filterMotorista} onChange={e => setFilterMotorista(e.target.value)}
-            className="flex-1 min-w-40 bg-slate-800/60 border border-slate-700/50 text-slate-300 text-sm rounded-xl px-3 py-2 outline-none">
-            <option value="">Todos os Motoristas</option>
-            {motoristasUnicos.map(m => <option key={m}>{m}</option>)}
-          </select>
-
-          {/* Descrição */}
+          {/* Descrição Global */}
           <div className="flex items-center gap-2 bg-slate-800/60 border border-slate-700/50 rounded-xl px-3 py-2 flex-1 min-w-40">
             <Search size={15} className="text-slate-400" />
             <input value={searchDesc} onChange={e => setSearchDesc(e.target.value)}
@@ -433,19 +551,24 @@ export default function EscalaExcel() {
           <table className="border-collapse text-xs w-full" style={{ minWidth: `${370 + days.length * 90}px` }}>
             <thead className="sticky top-0 z-20">
               <tr className="bg-slate-900 border-b-2 border-slate-700">
-                <th className="sticky left-0 z-30 bg-slate-900 border-r border-slate-700 px-1 py-2.5 min-w-[40px] max-w-[40px] no-print"></th>
-                <th onClick={() => setSortBy('empresa')} className="sticky left-[40px] z-30 bg-slate-900 border-r border-slate-700 px-3 py-2.5 text-left text-slate-400 font-semibold uppercase tracking-wide min-w-[130px] cursor-pointer hover:bg-slate-800 transition-colors">
-                  <div className="flex items-center gap-1 hover:text-white">Empresa {sortBy === 'empresa' && <span className="text-blue-400">↓</span>}</div>
+                <th className="sticky left-0 z-30 bg-slate-900 border-r border-slate-700 px-1 py-2 min-w-[40px] max-w-[40px] no-print"></th>
+                
+                <th className="sticky left-[40px] z-30 bg-slate-900 border-r border-slate-700 p-0 min-w-[130px]">
+                  <HeaderMenu title="Empresa" colKey="empresa" activeMenu={activeMenu} setActiveMenu={setActiveMenu} sortConfigs={sortConfigs} setSortConfigs={setSortConfigs} columnFilters={columnFilters} setColumnFilters={setColumnFilters} linhas={linhas} getVal={l => l.empresa} extraClass="py-2.5 px-3 text-slate-400 font-semibold uppercase tracking-wide" />
                 </th>
-                <th onClick={() => setSortBy('horario')} className="sticky left-[170px] z-30 bg-slate-900 border-r border-slate-700 px-2 py-2.5 text-left text-slate-400 font-semibold uppercase tracking-wide min-w-[60px] cursor-pointer hover:bg-slate-800 transition-colors">
-                  <div className="flex items-center gap-1 hover:text-white">Hora {sortBy === 'horario' && <span className="text-blue-400">↓</span>}</div>
+                
+                <th className="sticky left-[170px] z-30 bg-slate-900 border-r border-slate-700 p-0 min-w-[60px]">
+                  <HeaderMenu title="Hora" colKey="horario" activeMenu={activeMenu} setActiveMenu={setActiveMenu} sortConfigs={sortConfigs} setSortConfigs={setSortConfigs} columnFilters={columnFilters} setColumnFilters={setColumnFilters} linhas={linhas} getVal={l => l.horario} extraClass="py-2.5 px-2 text-slate-400 font-semibold uppercase tracking-wide" />
                 </th>
-                <th onClick={() => setSortBy('descricao')} className="sticky left-[230px] z-30 bg-slate-900 border-r border-slate-700 px-2 py-2.5 text-left text-slate-400 font-semibold uppercase tracking-wide min-w-[280px] cursor-pointer hover:bg-slate-800 transition-colors">
-                  <div className="flex items-center gap-1 hover:text-white">Linha / Descrição {sortBy === 'descricao' && <span className="text-blue-400">↓</span>}</div>
+                
+                <th className="sticky left-[230px] z-30 bg-slate-900 border-r border-slate-700 p-0 min-w-[280px]">
+                  <HeaderMenu title="Linha / Descrição" colKey="descricao" activeMenu={activeMenu} setActiveMenu={setActiveMenu} sortConfigs={sortConfigs} setSortConfigs={setSortConfigs} columnFilters={columnFilters} setColumnFilters={setColumnFilters} linhas={linhas} getVal={l => l.descricao} extraClass="py-2.5 px-2 text-slate-400 font-semibold uppercase tracking-wide" />
                 </th>
-                <th onClick={() => setSortBy('motorista')} className="border-r border-slate-700 px-2 py-2.5 text-left text-slate-400 font-semibold uppercase tracking-wide min-w-[110px] cursor-pointer hover:bg-slate-800 transition-colors">
-                  <div className="flex items-center gap-1 hover:text-white">Titular {sortBy === 'motorista' && <span className="text-blue-400">↓</span>}</div>
+                
+                <th className="border-r border-slate-700 p-0 min-w-[110px]">
+                  <HeaderMenu title="Titular" colKey="motorista" activeMenu={activeMenu} setActiveMenu={setActiveMenu} sortConfigs={sortConfigs} setSortConfigs={setSortConfigs} columnFilters={columnFilters} setColumnFilters={setColumnFilters} linhas={linhas} getVal={l => l.motoristaTitularName} extraClass="py-2.5 px-2 text-slate-400 font-semibold uppercase tracking-wide" />
                 </th>
+
                 {days.map(d => {
                   const dateObj = new Date(selYear, selMonth, d);
                   const isWeekend = dateObj.getDay() === 0 || dateObj.getDay() === 6;
@@ -454,22 +577,23 @@ export default function EscalaExcel() {
                   return (
                     <th
                       key={d}
-                      onClick={() => setSortBy(`dia_${d}`)}
-                      className={`border-r border-slate-700/50 px-1 py-2.5 text-center font-semibold min-w-[90px] cursor-pointer hover:bg-slate-800 transition-colors ${
-                        isToday
-                          ? 'text-blue-400 bg-blue-500/10'
-                          : isWeekend 
-                            ? 'text-slate-500 bg-slate-800/80'
-                            : 'text-slate-300'
+                      className={`border-r border-slate-700/50 p-0 min-w-[90px] ${
+                        isToday ? 'bg-blue-500/10' : isWeekend ? 'bg-slate-800/80' : ''
                       }`}
                     >
-                      <div className="flex items-center justify-center gap-1">
-                        {d}
-                        {sortBy === `dia_${d}` && <span className="text-blue-400">↓</span>}
-                      </div>
-                      <div className={`font-normal text-[10px] ${isWeekend ? 'text-slate-500' : 'text-slate-400'}`}>
-                        {['Dom','Seg','Ter','Qua','Qui','Sex','Sáb'][dateObj.getDay()]}
-                      </div>
+                      <HeaderMenu 
+                        title={
+                          <div className="flex flex-col items-center">
+                            <span className={isToday ? 'text-blue-400 font-semibold' : 'text-slate-300 font-semibold'}>{d}</span>
+                            <span className={`font-normal text-[10px] ${isWeekend ? 'text-slate-500' : 'text-slate-400'}`}>
+                              {['Dom','Seg','Ter','Qua','Qui','Sex','Sáb'][dateObj.getDay()]}
+                            </span>
+                          </div>
+                        }
+                        colKey={`dia_${d}`}
+                        activeMenu={activeMenu} setActiveMenu={setActiveMenu} sortConfigs={sortConfigs} setSortConfigs={setSortConfigs} columnFilters={columnFilters} setColumnFilters={setColumnFilters} linhas={linhas} getVal={l => l.dias?.[`d${d}`]} 
+                        extraClass="py-1 px-1"
+                      />
                     </th>
                   );
                 })}
