@@ -374,20 +374,6 @@ export default function EscalaExcel() {
           {TURNOS.map(t => <option key={t}>{t}</option>)}
         </select>
 
-        <div className="flex items-center gap-2 bg-slate-800/60 border border-slate-700/50 rounded-xl px-3 py-1">
-          <span className="text-slate-400 text-xs font-medium">Ordenar por:</span>
-          <select
-            value={sortBy}
-            onChange={e => setSortBy(e.target.value)}
-            className="bg-transparent text-slate-200 text-sm outline-none font-medium py-1"
-          >
-            <option value="horario">Horário</option>
-            <option value="empresa">Empresa</option>
-            <option value="motorista">Motorista Titular</option>
-            <option value="descricao">Descrição / Linha</option>
-          </select>
-        </div>
-
         <span className="text-slate-500 text-xs ml-auto">{filtered.length} linhas</span>
       </div>
 
@@ -442,10 +428,18 @@ export default function EscalaExcel() {
             <thead className="sticky top-0 z-20">
               <tr className="bg-slate-900 border-b-2 border-slate-700">
                 <th className="sticky left-0 z-30 bg-slate-900 border-r border-slate-700 px-1 py-2.5 min-w-[40px] max-w-[40px] no-print"></th>
-                <th className="sticky left-[40px] z-30 bg-slate-900 border-r border-slate-700 px-3 py-2.5 text-left text-slate-400 font-semibold uppercase tracking-wide min-w-[130px]">Empresa</th>
-                <th className="sticky left-[170px] z-30 bg-slate-900 border-r border-slate-700 px-2 py-2.5 text-left text-slate-400 font-semibold uppercase tracking-wide min-w-[60px]">Hora</th>
-                <th className="sticky left-[230px] z-30 bg-slate-900 border-r border-slate-700 px-2 py-2.5 text-left text-slate-400 font-semibold uppercase tracking-wide min-w-[280px]">Linha / Descrição</th>
-                <th className="border-r border-slate-700 px-2 py-2.5 text-left text-slate-400 font-semibold uppercase tracking-wide min-w-[110px]">Titular</th>
+                <th onClick={() => setSortBy('empresa')} className="sticky left-[40px] z-30 bg-slate-900 border-r border-slate-700 px-3 py-2.5 text-left text-slate-400 font-semibold uppercase tracking-wide min-w-[130px] cursor-pointer hover:bg-slate-800 transition-colors">
+                  <div className="flex items-center gap-1 hover:text-white">Empresa {sortBy === 'empresa' && <span className="text-blue-400">↓</span>}</div>
+                </th>
+                <th onClick={() => setSortBy('horario')} className="sticky left-[170px] z-30 bg-slate-900 border-r border-slate-700 px-2 py-2.5 text-left text-slate-400 font-semibold uppercase tracking-wide min-w-[60px] cursor-pointer hover:bg-slate-800 transition-colors">
+                  <div className="flex items-center gap-1 hover:text-white">Hora {sortBy === 'horario' && <span className="text-blue-400">↓</span>}</div>
+                </th>
+                <th onClick={() => setSortBy('descricao')} className="sticky left-[230px] z-30 bg-slate-900 border-r border-slate-700 px-2 py-2.5 text-left text-slate-400 font-semibold uppercase tracking-wide min-w-[280px] cursor-pointer hover:bg-slate-800 transition-colors">
+                  <div className="flex items-center gap-1 hover:text-white">Linha / Descrição {sortBy === 'descricao' && <span className="text-blue-400">↓</span>}</div>
+                </th>
+                <th onClick={() => setSortBy('motorista')} className="border-r border-slate-700 px-2 py-2.5 text-left text-slate-400 font-semibold uppercase tracking-wide min-w-[110px] cursor-pointer hover:bg-slate-800 transition-colors">
+                  <div className="flex items-center gap-1 hover:text-white">Titular {sortBy === 'motorista' && <span className="text-blue-400">↓</span>}</div>
+                </th>
                 {days.map(d => {
                   const dateObj = new Date(selYear, selMonth, d);
                   const isWeekend = dateObj.getDay() === 0 || dateObj.getDay() === 6;
