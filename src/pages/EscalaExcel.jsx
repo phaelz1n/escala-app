@@ -154,6 +154,7 @@ export default function EscalaExcel() {
   const { linhas, drivers, updateLinha, addLinha, deleteLinha } = useApp();
 
   const now = new Date();
+  const todayDay = now.getDate();
   const [selMonth, setSelMonth] = useState(now.getMonth());
   const [selYear,  setSelYear]  = useState(now.getFullYear());
   const [searchDesc, setSearchDesc] = useState('');
@@ -176,8 +177,6 @@ export default function EscalaExcel() {
   );
   const days = useMemo(() => Array.from({ length: daysInMonth }, (_, i) => i + 1), [daysInMonth]);
 
-  // Today's day number
-  const todayDay = now.getDate();
   const isCurrentMonth = now.getMonth() === selMonth && now.getFullYear() === selYear;
 
   // Extract unique companies and drivers for filters
