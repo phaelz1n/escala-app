@@ -16,6 +16,9 @@ import Ferias from './pages/Ferias';
 import Motoristas from './pages/Motoristas';
 import TokDoGuarda from './pages/TokDoGuarda';
 
+import Logs from './pages/Logs';
+import ImportExcel from './pages/ImportExcel';
+
 import { LogOut, Loader2 } from 'lucide-react';
 
 const PAGES = {
@@ -25,6 +28,8 @@ const PAGES = {
   ferias:              Ferias,
   motoristas:          Motoristas,
   tokguarda:           TokDoGuarda,
+  logs:                Logs,
+  import_excel:        ImportExcel,
 };
 
 function LoadingScreen() {
@@ -92,7 +97,7 @@ export default function App() {
   const showApp = !isFirebaseConfigured || user;
 
   return (
-    <AppProvider>
+    <AppProvider user={user}>
       {showApp ? <AppContent user={user}/> : <Login/>}
     </AppProvider>
   );

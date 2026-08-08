@@ -109,14 +109,28 @@ function TokCard({ tok, onConfirm, onEdit, onDelete }) {
 }
 
 // ─── Linha de impressão ────────────────────────────────────────────────────────
-function PrintRow({ tok, index }) {
+function PrintRow({ tok, index, drivers }) {
+  // If tok.telefone is missing, try to find it in the drivers list
+  let telefone = tok.telefone;
+  if (!telefone && tok.motoristaName) {
+    const driver = drivers.find(d => d.name === tok.motoristaName);
+    if (driver?.phone) telefone = driver.phone;
+  }
+
+  const formatPhone = (phone) => {
+    if (!phone) return '';
+    const digits = phone.replace(/\D/g, '');
+    if (digits.length === 11) return `(${digits.slice(0,2)}) ${digits.slice(2,7)}-${digits.slice(7)}`;
+    if (digits.length === 10) return `(${digits.slice(0,2)}) ${digits.slice(2,6)}-${digits.slice(6)}`;
+    return phone;
+  };
   return (
     <tr className="border-b border-gray-200">
       <td className="px-3 py-2 text-center font-mono font-bold text-sm">{tok.horarioChamada || tok.horario}</td>
       <td className="px-3 py-2 text-sm">{tok.empresa}</td>
       <td className="px-3 py-2 text-xs text-gray-600">{tok.descricao}</td>
       <td className="px-3 py-2 font-semibold text-sm">{tok.motoristaName || <span className="text-red-600">VAGO</span>}</td>
-      <td className="px-3 py-2 text-sm font-mono">{tok.telefone ? `(${tok.telefone.slice(0,2)}) ${tok.telefone.slice(2,7)}-${tok.telefone.slice(7)}` : ''}</td>
+      <td className="px-3 py-2 text-sm font-mono">{formatPhone(telefone)}</td>
       <td className="px-3 py-2 text-center"><div className="w-8 h-8 border-2 border-gray-400 rounded-sm mx-auto" /></td>
       <td className="px-3 py-2"><div className="border-b border-gray-400 mx-2 mt-4" /></td>
     </tr>
@@ -255,7 +269,7 @@ export default function TokDoGuarda() {
             </tr>
           </thead>
           <tbody>
-            {filtered.map((t, i) => <PrintRow key={t.id} tok={t} index={i}/>)}
+            {filtered.map((tok, index) => <PrintRow key={tok.id} tok={tok} index={index} drivers={drivers} />)}
           </tbody>
         </table>
         <div className="mt-8 flex justify-between text-xs text-gray-500">

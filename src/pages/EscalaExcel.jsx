@@ -3,7 +3,7 @@
 // Linhas de ônibus nas linhas, dias do mês (1-31) nas colunas.
 // Edição inline em cada célula, salva no Firestore instantaneamente.
 
-import { useState, useMemo, useRef } from 'react';
+import { useState, useMemo, useRef, useEffect } from 'react';
 import { useApp } from '../context/AppContext';
 import PrintButton from '../components/PrintButton';
 import {
@@ -65,7 +65,7 @@ function EditableCell({ value, onChange, placeholder = '—', className = '' }) 
 }
 
 // ─── Linha da tabela ───────────────────────────────────────────────────────────
-function LinhaRow({ linha, days, drivers, onUpdate, onDelete }) {
+function LinhaRow({ linha, days, drivers, selYear, selMonth, todayDay, isCurrentMonth, onUpdate, onDelete }) {
   const [confirmDelete, setConfirmDelete] = useState(false);
 
   // driver cells: each day-slot has a motorista key like `dia_1`, `dia_2`, etc.
@@ -92,11 +92,46 @@ function LinhaRow({ linha, days, drivers, onUpdate, onDelete }) {
       </td>
 
       {/* Day cells */}
-      {days.map(d => (
-        <td key={d} className="border-r border-slate-700/20 px-1 py-1 min-w-[90px]">
-          <EditableCell value={getDia(d)} onChange={v => setDia(d, v)} placeholder="—" />
-        </td>
-      ))}
+      {days.map(d => {
+        const dateObj = new Date(selYear, selMonth, d);
+        const isWeekend = dateObj.getDay() === 0 || dateObj.getDay() === 6;
+        const isToday = isCurrentMonth && d === todayDay;
+        
+        const cellValue = getDia(d);
+        
+        let bgClass = '';
+        let isBeforeCreation = false;
+        
+        if (linha.dataCriacao) {
+          const creationDate = new Date(linha.dataCriacao);
+          // Set hours to 0 to compare just the date parts safely
+          creationDate.setHours(0,0,0,0);
+          dateObj.setHours(0,0,0,0);
+          if (dateObj < creationDate) {
+            isBeforeCreation = true;
+          }
+        }
+
+        const isOff = !isBeforeCreation && (!cellValue.trim() || ['x', 'folga', 'não roda', 'nao roda'].includes(cellValue.trim().toLowerCase()));
+
+        if (isBeforeCreation) bgClass = 'bg-slate-800/40 text-slate-600 cursor-not-allowed'; // Inactive style
+        else if (isOff) bgClass = 'bg-red-500/20 text-red-300';
+        else if (isToday) bgClass = 'bg-blue-500/5';
+        else if (isWeekend) bgClass = 'bg-slate-800/80';
+
+        return (
+          <td 
+            key={d} 
+            className={`border-r border-slate-700/20 px-1 py-1 min-w-[90px] ${bgClass}`}
+          >
+            {isBeforeCreation ? (
+              <div className="text-center text-[10px] text-slate-600">—</div>
+            ) : (
+              <EditableCell value={cellValue} onChange={v => setDia(d, v)} placeholder="—" />
+            )}
+          </td>
+        );
+      })}
 
       {/* Delete */}
       <td className="px-2 py-1.5 no-print">
@@ -121,10 +156,18 @@ export default function EscalaExcel() {
   const now = new Date();
   const [selMonth, setSelMonth] = useState(now.getMonth());
   const [selYear,  setSelYear]  = useState(now.getFullYear());
-  const [search, setSearch]     = useState('');
+  const [searchDesc, setSearchDesc] = useState('');
+  const [filterEmpresa, setFilterEmpresa] = useState('');
+  const [filterMotorista, setFilterMotorista] = useState('');
+  const [hideEmpty, setHideEmpty] = useState(false);
+  const [printDay, setPrintDay] = useState(todayDay);
+  
   const [filterTurno, setFilterTurno] = useState('');
   const [showAddRow, setShowAddRow]   = useState(false);
   const [newLinha, setNewLinha] = useState({ empresa: '', horario: '', descricao: '', turno: 'Noite', pontoInicio: 'Garagem' });
+
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 50;
 
   // Days in selected month
   const daysInMonth = useMemo(
@@ -137,14 +180,54 @@ export default function EscalaExcel() {
   const todayDay = now.getDate();
   const isCurrentMonth = now.getMonth() === selMonth && now.getFullYear() === selYear;
 
+  // Extract unique companies and drivers for filters
+  const empresasUnicas = useMemo(() => {
+    const list = Array.from(new Set(linhas.map(l => l.empresa).filter(Boolean)));
+    return list.sort();
+  }, [linhas]);
+
+  const motoristasUnicos = useMemo(() => {
+    const list = Array.from(new Set(drivers.map(d => d.name).filter(Boolean)));
+    return list.sort();
+  }, [drivers]);
+
   const filtered = useMemo(() => {
     return linhas.filter(l => {
-      const q = search.toLowerCase();
-      if (q && !l.empresa?.toLowerCase().includes(q) && !l.descricao?.toLowerCase().includes(q) && !l.motoristaTitularName?.toLowerCase().includes(q)) return false;
+      // Filtrar linhas que foram criadas em um mês posterior ao selecionado
+      if (l.dataCriacao) {
+        const creationDate = new Date(l.dataCriacao);
+        const viewDate = new Date(selYear, selMonth + 1, 0); // Last day of selected month
+        if (creationDate > viewDate) return false;
+      }
+
+      // 1. Empresa
+      if (filterEmpresa && l.empresa !== filterEmpresa) return false;
+      
+      // 2. Motorista Titular
+      if (filterMotorista && l.motoristaTitularName !== filterMotorista) return false;
+      
+      // 3. Descrição
+      const q = searchDesc.toLowerCase();
+      if (q && !l.descricao?.toLowerCase().includes(q)) return false;
+      
+      // 4. Turno
       if (filterTurno && l.turno !== filterTurno) return false;
+      
+      // 5. Hide Empty (oculta se não tem motorista titular, ou no print pode ter lógica especial, mas a UI quer esconder se a linha em si não tem)
+      // Ocultar Sem Motorista: Se ativado, esconde as linhas que não tem titular.
+      if (hideEmpty && !l.motoristaTitularName) return false;
+
       return true;
     }).sort((a, b) => (a.horario || '').localeCompare(b.horario || ''));
-  }, [linhas, search, filterTurno]);
+  }, [linhas, filterEmpresa, filterMotorista, searchDesc, filterTurno, hideEmpty, selMonth, selYear]);
+
+  // Reset pagination when filters change
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [filterEmpresa, filterMotorista, searchDesc, filterTurno, hideEmpty, selMonth, selYear]);
+
+  const totalPages = Math.max(1, Math.ceil(filtered.length / itemsPerPage));
+  const paginated = filtered.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
 
   const prevMonth = () => {
     if (selMonth === 0) { setSelMonth(11); setSelYear(y => y - 1); }
@@ -157,7 +240,13 @@ export default function EscalaExcel() {
 
   const handleAddLinha = async () => {
     if (!newLinha.empresa || !newLinha.horario) return;
-    await addLinha({ ...newLinha, status: 'Escalado', motoristaTitularName: '', dias: {} });
+    await addLinha({ 
+      ...newLinha, 
+      status: 'Escalado', 
+      motoristaTitularName: '', 
+      dias: {},
+      dataCriacao: new Date().toISOString()
+    });
     setNewLinha({ empresa: '', horario: '', descricao: '', turno: 'Noite', pontoInicio: 'Garagem' });
     setShowAddRow(false);
   };
@@ -171,6 +260,16 @@ export default function EscalaExcel() {
           <p className="text-slate-400 text-sm mt-0.5">Edite qualquer célula diretamente. Salva automaticamente no Firebase.</p>
         </div>
         <div className="flex items-center gap-2 no-print">
+          <div className="flex items-center gap-2 bg-slate-800 border border-slate-700/50 rounded-xl px-3 py-1">
+            <span className="text-slate-400 text-xs">Imprimir Dia:</span>
+            <select 
+              value={printDay} 
+              onChange={e => setPrintDay(Number(e.target.value))}
+              className="bg-transparent text-slate-200 text-sm font-semibold outline-none"
+            >
+              {days.map(d => <option key={d} value={d}>{String(d).padStart(2, '0')}</option>)}
+            </select>
+          </div>
           <PrintButton />
           <button
             onClick={() => setShowAddRow(true)}
@@ -189,14 +288,33 @@ export default function EscalaExcel() {
           <button onClick={nextMonth} className="p-1.5 text-slate-400 hover:text-white hover:bg-slate-700 rounded-lg transition-colors"><ChevronRight size={16}/></button>
         </div>
 
-        <div className="flex items-center gap-2 bg-slate-800/60 border border-slate-700/50 rounded-xl px-3 py-2 flex-1 max-w-60">
-          <Search size={15} className="text-slate-400" />
-          <input
-            value={search}
-            onChange={e => setSearch(e.target.value)}
-            placeholder="Filtrar linhas..."
-            className="bg-transparent text-slate-200 text-sm outline-none w-full placeholder:text-slate-500"
-          />
+        <div className="flex gap-3 w-full flex-wrap">
+          {/* Empresa */}
+          <select value={filterEmpresa} onChange={e => setFilterEmpresa(e.target.value)}
+            className="flex-1 min-w-32 bg-slate-800/60 border border-slate-700/50 text-slate-300 text-sm rounded-xl px-3 py-2 outline-none">
+            <option value="">Todas as Empresas</option>
+            {empresasUnicas.map(e => <option key={e}>{e}</option>)}
+          </select>
+
+          {/* Motorista */}
+          <select value={filterMotorista} onChange={e => setFilterMotorista(e.target.value)}
+            className="flex-1 min-w-40 bg-slate-800/60 border border-slate-700/50 text-slate-300 text-sm rounded-xl px-3 py-2 outline-none">
+            <option value="">Todos os Motoristas</option>
+            {motoristasUnicos.map(m => <option key={m}>{m}</option>)}
+          </select>
+
+          {/* Descrição */}
+          <div className="flex items-center gap-2 bg-slate-800/60 border border-slate-700/50 rounded-xl px-3 py-2 flex-1 min-w-40">
+            <Search size={15} className="text-slate-400" />
+            <input value={searchDesc} onChange={e => setSearchDesc(e.target.value)}
+              placeholder="Buscar descrição..."
+              className="bg-transparent text-slate-200 text-sm outline-none w-full placeholder:text-slate-500" />
+          </div>
+          
+          <label className="flex items-center gap-2 text-slate-300 text-sm cursor-pointer bg-slate-800/60 border border-slate-700/50 rounded-xl px-3 py-2">
+            <input type="checkbox" checked={hideEmpty} onChange={e => setHideEmpty(e.target.checked)} className="rounded bg-slate-700 border-slate-600 text-blue-500"/>
+            Ocultar Sem Motorista
+          </label>
         </div>
         <select
           value={filterTurno}
@@ -255,7 +373,7 @@ export default function EscalaExcel() {
       )}
 
       {/* Excel table */}
-      <div className="bg-slate-800/60 border border-slate-700/50 rounded-2xl overflow-hidden">
+      <div className="bg-slate-800/60 border border-slate-700/50 rounded-2xl overflow-hidden no-print">
         <div className="overflow-auto" style={{ maxHeight: 'calc(100vh - 300px)' }}>
           <table className="border-collapse text-xs w-full" style={{ minWidth: `${370 + days.length * 90}px` }}>
             <thead className="sticky top-0 z-20">
@@ -264,36 +382,48 @@ export default function EscalaExcel() {
                 <th className="sticky left-[130px] z-30 bg-slate-900 border-r border-slate-700 px-2 py-2.5 text-left text-slate-400 font-semibold uppercase tracking-wide min-w-[60px]">Hora</th>
                 <th className="sticky left-[190px] z-30 bg-slate-900 border-r border-slate-700 px-2 py-2.5 text-left text-slate-400 font-semibold uppercase tracking-wide min-w-[180px]">Linha / Descrição</th>
                 <th className="border-r border-slate-700 px-2 py-2.5 text-left text-slate-400 font-semibold uppercase tracking-wide min-w-[110px]">Titular</th>
-                {days.map(d => (
-                  <th
-                    key={d}
-                    className={`border-r border-slate-700/50 px-1 py-2.5 text-center font-semibold min-w-[90px] ${
-                      isCurrentMonth && d === todayDay
-                        ? 'text-blue-400 bg-blue-500/10'
-                        : 'text-slate-400'
-                    }`}
-                  >
-                    <div>{d}</div>
-                    <div className="text-slate-600 font-normal text-[10px]">
-                      {['Dom','Seg','Ter','Qua','Qui','Sex','Sáb'][new Date(selYear, selMonth, d).getDay()]}
-                    </div>
-                  </th>
-                ))}
+                {days.map(d => {
+                  const dateObj = new Date(selYear, selMonth, d);
+                  const isWeekend = dateObj.getDay() === 0 || dateObj.getDay() === 6;
+                  const isToday = isCurrentMonth && d === todayDay;
+
+                  return (
+                    <th
+                      key={d}
+                      className={`border-r border-slate-700/50 px-1 py-2.5 text-center font-semibold min-w-[90px] ${
+                        isToday
+                          ? 'text-blue-400 bg-blue-500/10'
+                          : isWeekend 
+                            ? 'text-slate-500 bg-slate-800/80'
+                            : 'text-slate-300'
+                      }`}
+                    >
+                      <div>{d}</div>
+                      <div className={`font-normal text-[10px] ${isWeekend ? 'text-slate-500' : 'text-slate-400'}`}>
+                        {['Dom','Seg','Ter','Qua','Qui','Sex','Sáb'][dateObj.getDay()]}
+                      </div>
+                    </th>
+                  );
+                })}
                 <th className="px-2 py-2.5 no-print" />
               </tr>
             </thead>
             <tbody>
-              {filtered.map(linha => (
+              {paginated.map(linha => (
                 <LinhaRow
                   key={linha.id}
                   linha={linha}
                   days={days}
                   drivers={drivers}
+                  selYear={selYear}
+                  selMonth={selMonth}
+                  todayDay={todayDay}
+                  isCurrentMonth={isCurrentMonth}
                   onUpdate={updateLinha}
                   onDelete={deleteLinha}
                 />
               ))}
-              {filtered.length === 0 && (
+              {paginated.length === 0 && (
                 <tr>
                   <td colSpan={days.length + 5} className="py-12 text-center text-slate-500 text-sm">
                     Nenhuma linha encontrada. Clique em "Nova Linha" para adicionar.
@@ -303,12 +433,86 @@ export default function EscalaExcel() {
             </tbody>
           </table>
         </div>
+        
+        {/* Pagination Controls */}
+        {totalPages > 1 && (
+          <div className="flex items-center justify-between p-3 border-t border-slate-700/50 bg-slate-800/80 no-print">
+            <span className="text-slate-400 text-xs">
+              Mostrando {((currentPage - 1) * itemsPerPage) + 1} a {Math.min(currentPage * itemsPerPage, filtered.length)} de {filtered.length} linhas
+            </span>
+            <div className="flex items-center gap-2">
+              <button 
+                onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                disabled={currentPage === 1}
+                className="px-3 py-1.5 bg-slate-700 hover:bg-slate-600 disabled:opacity-50 text-slate-300 text-xs rounded-lg transition-colors"
+              >
+                Anterior
+              </button>
+              <span className="text-slate-300 text-xs font-semibold px-2">
+                Página {currentPage} de {totalPages}
+              </span>
+              <button 
+                onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                disabled={currentPage === totalPages}
+                className="px-3 py-1.5 bg-slate-700 hover:bg-slate-600 disabled:opacity-50 text-slate-300 text-xs rounded-lg transition-colors"
+              >
+                Próxima
+              </button>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Print header — only visible when printing */}
       <div className="print-only hidden">
-        <h1 className="text-xl font-bold text-center">ESCALA DE MOTORISTAS — {MESES[selMonth].toUpperCase()} {selYear}</h1>
-        <p className="text-center text-sm mt-1">Impresso em {new Date().toLocaleDateString('pt-BR')} às {new Date().toLocaleTimeString('pt-BR')}</p>
+        <div className="flex justify-between items-center mb-6 border-b-2 border-black pb-2">
+          <h1 className="text-2xl font-bold font-sans">TRANS PINHO</h1>
+          <h1 className="text-2xl font-bold font-sans">
+            ESCALA {['DOMINGO', 'SEGUNDA-FEIRA', 'TERÇA-FEIRA', 'QUARTA-FEIRA', 'QUINTA-FEIRA', 'SEXTA-FEIRA', 'SÁBADO'][new Date(selYear, selMonth, printDay).getDay()]} {String(printDay).padStart(2, '0')}/{String(selMonth + 1).padStart(2, '0')}
+          </h1>
+        </div>
+
+        <table className="w-full text-[10px] border-collapse">
+          <thead>
+            <tr>
+              <th className="border border-black px-2 py-1 bg-gray-200 uppercase">Empresa</th>
+              <th className="border border-black px-2 py-1 bg-gray-200 uppercase">Filial</th>
+              <th className="border border-black px-2 py-1 bg-gray-200 uppercase">Horário</th>
+              <th className="border border-black px-2 py-1 bg-gray-200 uppercase">Descrição</th>
+              <th className="border border-black px-2 py-1 bg-gray-200 uppercase">Motorista</th>
+              <th className="border border-black px-2 py-1 bg-gray-200 uppercase">Confirmação</th>
+              <th className="border border-black px-2 py-1 bg-gray-200 uppercase">Seq</th>
+            </tr>
+          </thead>
+          <tbody>
+            {filtered.map((linha, idx) => {
+              // Hide from print if the print day is before the creation date
+              if (linha.dataCriacao) {
+                const creationDate = new Date(linha.dataCriacao);
+                creationDate.setHours(0,0,0,0);
+                const printDate = new Date(selYear, selMonth, printDay);
+                printDate.setHours(0,0,0,0);
+                if (printDate < creationDate) return null;
+              }
+
+              const motoristaDoDia = linha.dias?.[`d${printDay}`] || '';
+              // Hide empty rows logic in print if toggle is on
+              if (hideEmpty && !motoristaDoDia) return null;
+              
+              return (
+                <tr key={linha.id}>
+                  <td className="border border-black px-2 py-1 text-center font-semibold">{linha.empresa}</td>
+                  <td className="border border-black px-2 py-1 text-center">GTI</td>
+                  <td className="border border-black px-2 py-1 text-center">{linha.horario}</td>
+                  <td className="border border-black px-2 py-1">{linha.descricao}</td>
+                  <td className="border border-black px-2 py-1 text-center font-bold">{motoristaDoDia}</td>
+                  <td className="border border-black px-2 py-1 text-center"></td>
+                  <td className="border border-black px-2 py-1 text-center text-gray-500">{idx + 1}</td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
       </div>
     </div>
   );

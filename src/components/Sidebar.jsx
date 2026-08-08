@@ -12,7 +12,7 @@ const navItems = [
 ];
 
 export default function Sidebar({ activeTab, onTabChange }) {
-  const { isFirebaseConfigured } = useApp();
+  const { isFirebaseConfigured, isAdmin } = useApp();
 
   return (
     <aside className="no-print w-64 min-h-screen bg-gradient-to-b from-slate-900 via-slate-800 to-slate-900 flex flex-col border-r border-slate-700/50 shadow-2xl">
@@ -69,6 +69,40 @@ export default function Sidebar({ activeTab, onTabChange }) {
             </button>
           );
         })}
+
+        {isAdmin && (
+          <div className="pt-4 mt-4 border-t border-slate-700/50 space-y-1">
+            <p className="px-4 text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2">Administração</p>
+            <button
+              onClick={() => onTabChange('logs')}
+              className={`
+                w-full flex items-center gap-3 px-4 py-2.5 rounded-xl text-sm font-medium
+                transition-all duration-200 group relative overflow-hidden
+                ${activeTab === 'logs'
+                  ? `bg-gradient-to-r from-zinc-600 to-zinc-700 text-white shadow-lg`
+                  : 'text-slate-400 hover:text-white hover:bg-slate-700/60'
+                }
+              `}
+            >
+              <FileText size={17} className={`shrink-0 transition-transform duration-200 ${activeTab !== 'logs' && 'group-hover:scale-110'}`} />
+              <span>Auditoria & Logs</span>
+            </button>
+            <button
+              onClick={() => onTabChange('import_excel')}
+              className={`
+                w-full flex items-center gap-3 px-4 py-2.5 rounded-xl text-sm font-medium
+                transition-all duration-200 group relative overflow-hidden
+                ${activeTab === 'import_excel'
+                  ? `bg-gradient-to-r from-green-600 to-green-700 text-white shadow-lg`
+                  : 'text-slate-400 hover:text-white hover:bg-slate-700/60'
+                }
+              `}
+            >
+              <Database size={17} className={`shrink-0 transition-transform duration-200 ${activeTab !== 'import_excel' && 'group-hover:scale-110'}`} />
+              <span>Importar Excel</span>
+            </button>
+          </div>
+        )}
       </nav>
 
       {/* Footer */}

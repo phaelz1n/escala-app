@@ -22,8 +22,9 @@ const AppContext = createContext(null);
 // ─── Helper: today as YYYY-MM-DD ─────────────────────────────────────────────
 const todayStr = () => new Date().toISOString().split('T')[0];
 
-export function AppProvider({ children }) {
+export function AppProvider({ children, user }) {
   // ── State ─────────────────────────────────────────────────────────────────
+  const isAdmin = user?.email === 'operacional4@transpinho.com';
   const [drivers,      setDrivers]      = useState(initialDrivers);
   const [linhas,       setLinhas]       = useState(initialSchedules);
   const [toks,         setToks]         = useState(
@@ -34,6 +35,7 @@ export function AppProvider({ children }) {
   const [atestados,    setAtestados]    = useState(initialMedicalLeaves);
   const [vacations,    setVacations]    = useState(initialVacations);
   const [alerts,       setAlerts]       = useState([]);
+  const [logs,         setLogs]         = useState([]);
   const [fbReady,      setFbReady]      = useState(false);
 
   // ── Firebase listeners ────────────────────────────────────────────────────
@@ -49,6 +51,10 @@ export function AppProvider({ children }) {
       fsListen('atestados',  setAtestados),
       fsListen('ferias',     setVacations),
     ];
+    
+    if (isAdmin) {
+      unsubs.push(fsListen('logs', setLogs));
+    }
 
     return () => unsubs.forEach(u => u());
   }, []);
@@ -64,6 +70,21 @@ export function AppProvider({ children }) {
     setAlerts(prev => prev.filter(a => a.id !== id));
   }, []);
 
+  // ── Logger ────────────────────────────────────────────────────────────────
+  const addLog = useCallback(async (action, details) => {
+    if (!isFirebaseConfigured || !user) return;
+    try {
+      await fsAdd('logs', {
+        action,
+        details,
+        user: user.email,
+        timestamp: new Date().toISOString(),
+      });
+    } catch (e) {
+      console.error('Failed to write log', e);
+    }
+  }, [user]);
+
   // ── Driver CRUD ───────────────────────────────────────────────────────────
   const addDriver = useCallback(async (data) => {
     if (isFirebaseConfigured) {
@@ -72,7 +93,8 @@ export function AppProvider({ children }) {
       setDrivers(prev => [...prev, { ...data, id: Date.now() }]);
     }
     addAlert(`Motorista ${data.name} cadastrado!`, 'success');
-  }, [addAlert]);
+    addLog('Adicionar Motorista', `Adicionou o motorista ${data.name}`);
+  }, [addAlert, addLog]);
 
   const updateDriver = useCallback(async (id, data) => {
     if (isFirebaseConfigured) {
@@ -81,7 +103,8 @@ export function AppProvider({ children }) {
       setDrivers(prev => prev.map(d => d.id === id ? { ...d, ...data } : d));
     }
     addAlert('Motorista atualizado!', 'success');
-  }, [addAlert]);
+    addLog('Editar Motorista', `Atualizou o motorista ${data.name || id}`);
+  }, [addAlert, addLog]);
 
   const deleteDriver = useCallback(async (id) => {
     const d = drivers.find(x => x.id === id);
@@ -91,7 +114,8 @@ export function AppProvider({ children }) {
       setDrivers(prev => prev.filter(d => d.id !== id));
     }
     addAlert(`${d?.name} removido.`, 'warning');
-  }, [drivers, addAlert]);
+    addLog('Remover Motorista', `Removeu o motorista ${d?.name || id}`);
+  }, [drivers, addAlert, addLog]);
 
   // ── Linha CRUD ────────────────────────────────────────────────────────────
   const addLinha = useCallback(async (data) => {
@@ -101,7 +125,8 @@ export function AppProvider({ children }) {
       setLinhas(prev => [...prev, { ...data, id: `ESC${Date.now()}` }]);
     }
     addAlert('Linha adicionada!', 'success');
-  }, [addAlert]);
+    addLog('Adicionar Linha', `Adicionou a linha ${data.descricao || data.horario}`);
+  }, [addAlert, addLog]);
 
   const updateLinha = useCallback(async (id, data) => {
     if (isFirebaseConfigured) {
@@ -109,7 +134,8 @@ export function AppProvider({ children }) {
     } else {
       setLinhas(prev => prev.map(l => l.id === id ? { ...l, ...data } : l));
     }
-  }, []);
+    addLog('Editar Linha', `Atualizou a linha ${id}`);
+  }, [addLog]);
 
   const deleteLinha = useCallback(async (id) => {
     if (isFirebaseConfigured) {
@@ -118,7 +144,8 @@ export function AppProvider({ children }) {
       setLinhas(prev => prev.filter(l => l.id !== id));
     }
     addAlert('Linha removida.', 'warning');
-  }, [addAlert]);
+    addLog('Remover Linha', `Removeu a linha ${id}`);
+  }, [addAlert, addLog]);
 
   // ── Tok CRUD ──────────────────────────────────────────────────────────────
   const addTok = useCallback(async (data) => {
@@ -129,7 +156,8 @@ export function AppProvider({ children }) {
       setToks(prev => [...prev, { ...tokData, id: `TOK${Date.now()}` }]);
     }
     addAlert('Tok adicionado!', 'success');
-  }, [addAlert]);
+    addLog('Adicionar Tok', `Adicionou o tok ${data.empresa} - ${data.horarioChamada}`);
+  }, [addAlert, addLog]);
 
   const updateTok = useCallback(async (id, data) => {
     if (isFirebaseConfigured) {
@@ -137,7 +165,8 @@ export function AppProvider({ children }) {
     } else {
       setToks(prev => prev.map(t => t.id === id ? { ...t, ...data } : t));
     }
-  }, []);
+    addLog('Editar Tok', `Atualizou o tok ${id} para ${data.status || 'editado'}`);
+  }, [addLog]);
 
   const deleteTok = useCallback(async (id) => {
     if (isFirebaseConfigured) {
@@ -146,7 +175,8 @@ export function AppProvider({ children }) {
       setToks(prev => prev.filter(t => t.id !== id));
     }
     addAlert('Tok removido.', 'warning');
-  }, [addAlert]);
+    addLog('Remover Tok', `Removeu o tok ${id}`);
+  }, [addAlert, addLog]);
 
   // ── Substituição direta ───────────────────────────────────────────────────
   const applySubstitute = useCallback(async (scheduleId, substituteName) => {
@@ -212,8 +242,9 @@ export function AppProvider({ children }) {
     if (suggestions.length > 0) {
       addAlert(`💡 Substituto sugerido: ${suggestions[0].substitute.name}`, 'info');
     }
+    addLog('Registrar Atestado', `Registrou atestado para ${driverName} (${leave.startDate} a ${leave.endDate})`);
     return newLeave;
-  }, [drivers, linhas, suggestSubstitute, addAlert]);
+  }, [drivers, linhas, suggestSubstitute, addAlert, addLog]);
 
   const cancelMedicalLeave = useCallback(async (leaveId) => {
     const leave = atestados.find(l => l.id === leaveId);
@@ -230,7 +261,8 @@ export function AppProvider({ children }) {
       setAtestados(prev => prev.filter(l => l.id !== leaveId));
     }
     addAlert(`Atestado de ${leave.driverName} cancelado.`, 'warning');
-  }, [atestados, drivers, addAlert]);
+    addLog('Cancelar Atestado', `Cancelou o atestado de ${leave.driverName}`);
+  }, [atestados, drivers, addAlert, addLog]);
 
   // ── Férias ────────────────────────────────────────────────────────────────
   const registerVacation = useCallback(async (vacation) => {
@@ -260,7 +292,8 @@ export function AppProvider({ children }) {
       setVacations(prev => [...prev, { ...vacation, id: `FER${Date.now()}`, status: 'Agendado' }]);
     }
     addAlert(`Férias de ${driverName} programadas!`, 'success');
-  }, [linhas, addAlert]);
+    addLog('Programar Férias', `Programou férias para ${driverName} (${vacation.startDate} a ${vacation.endDate})`);
+  }, [linhas, addAlert, addLog]);
 
   const cancelVacation = useCallback(async (vacationId) => {
     const vac = vacations.find(v => v.id === vacationId);
@@ -274,7 +307,8 @@ export function AppProvider({ children }) {
       setVacations(prev => prev.filter(v => v.id !== vacationId));
     }
     addAlert(`Férias de ${vac.driverName} canceladas.`, 'warning');
-  }, [vacations, addAlert]);
+    addLog('Cancelar Férias', `Cancelou férias de ${vac.driverName}`);
+  }, [vacations, addAlert, addLog]);
 
   // ── Dashboard stats ───────────────────────────────────────────────────────
   const dashboardStats = useMemo(() => ({
@@ -295,6 +329,7 @@ export function AppProvider({ children }) {
   }), [drivers, linhas, toks]);
 
   const value = {
+    user, isAdmin, logs,
     drivers, linhas, toks, atestados, vacations, alerts,
     dashboardStats, fbReady, isFirebaseConfigured,
     addDriver, updateDriver, deleteDriver,
