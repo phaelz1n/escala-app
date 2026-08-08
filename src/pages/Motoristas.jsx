@@ -4,11 +4,11 @@ import { useState, useMemo } from 'react';
 import { useApp } from '../context/AppContext';
 import {
   Database, Plus, Edit2, Trash2, Search, X,
-  Phone, User, CheckCircle, AlertTriangle, Palmtree, Clock,
+  Phone, User, CheckCircle, AlertTriangle, Palmtree, Clock, UserX
 } from 'lucide-react';
 
 const CATEGORIAS = ['Titular', 'Reserva', 'Ferista', 'Horista 6h', 'Horista 4h'];
-const STATUS_LIST = ['Ativo', 'Férias', 'Atestado', 'Folga'];
+const STATUS_LIST = ['Ativo', 'Férias', 'Atestado', 'Folga', 'Inativo'];
 
 const categoriaColors = {
   Titular:     'bg-blue-500/20 text-blue-300 border-blue-500/30',
@@ -23,6 +23,7 @@ const statusConfig = {
   Atestado: { badge: 'bg-red-500/20 text-red-300 border-red-500/30',            icon: <AlertTriangle size={11}/> },
   'Férias': { badge: 'bg-purple-500/20 text-purple-300 border-purple-500/30',   icon: <Palmtree size={11}/> },
   Folga:    { badge: 'bg-slate-500/20 text-slate-300 border-slate-500/30',      icon: <Clock size={11}/> },
+  Inativo:  { badge: 'bg-red-500/10 text-red-400 border-red-500/20',            icon: <UserX size={11}/> },
 };
 
 const emptyForm = { name: '', phone: '', categoria: 'Titular', status: 'Ativo' };
