@@ -483,16 +483,16 @@ export default function EscalaExcel() {
           </h1>
         </div>
 
-        <table className="w-full text-[10px] border-collapse">
+        <table className="w-full text-[9px] leading-tight border-collapse">
           <thead>
             <tr>
-              <th className="border border-black px-2 py-1 bg-gray-200 uppercase">Empresa</th>
-              <th className="border border-black px-2 py-1 bg-gray-200 uppercase">Filial</th>
-              <th className="border border-black px-2 py-1 bg-gray-200 uppercase">Horário</th>
-              <th className="border border-black px-2 py-1 bg-gray-200 uppercase">Descrição</th>
-              <th className="border border-black px-2 py-1 bg-gray-200 uppercase">Motorista</th>
-              <th className="border border-black px-2 py-1 bg-gray-200 uppercase">Confirmação</th>
-              <th className="border border-black px-2 py-1 bg-gray-200 uppercase">Seq</th>
+              <th className="border border-black px-1.5 py-1 bg-gray-200 uppercase">Empresa</th>
+              <th className="border border-black px-1.5 py-1 bg-gray-200 uppercase">Filial</th>
+              <th className="border border-black px-1.5 py-1 bg-gray-200 uppercase">Horário</th>
+              <th className="border border-black px-1.5 py-1 bg-gray-200 uppercase">Descrição</th>
+              <th className="border border-black px-1.5 py-1 bg-gray-200 uppercase">Motorista</th>
+              <th className="border border-black px-1.5 py-1 bg-gray-200 uppercase">Confirmação</th>
+              <th className="border border-black px-1.5 py-1 bg-gray-200 uppercase">Seq</th>
             </tr>
           </thead>
           <tbody>
@@ -509,16 +509,28 @@ export default function EscalaExcel() {
               const motoristaDoDia = linha.dias?.[`d${printDay}`] || '';
               // Hide empty rows logic in print if toggle is on
               if (hideEmpty && !motoristaDoDia) return null;
+
+              // Format time if it's >= 24h (e.g. 27:20 -> 03:20)
+              let displayHorario = linha.horario;
+              if (displayHorario) {
+                const parts = displayHorario.split(':');
+                if (parts.length === 2) {
+                  let h = Number(parts[0]);
+                  if (!isNaN(h) && h >= 24) {
+                    displayHorario = `${String(h - 24).padStart(2, '0')}:${parts[1]}`;
+                  }
+                }
+              }
               
               return (
                 <tr key={linha.id}>
-                  <td className="border border-black px-2 py-1 text-center font-semibold">{linha.empresa}</td>
-                  <td className="border border-black px-2 py-1 text-center">GTI</td>
-                  <td className="border border-black px-2 py-1 text-center">{linha.horario}</td>
-                  <td className="border border-black px-2 py-1">{linha.descricao}</td>
-                  <td className="border border-black px-2 py-1 text-center font-bold">{motoristaDoDia}</td>
-                  <td className="border border-black px-2 py-1 text-center"></td>
-                  <td className="border border-black px-2 py-1 text-center text-gray-500">{idx + 1}</td>
+                  <td className="border border-black px-1.5 py-[2px] text-center font-semibold">{linha.empresa}</td>
+                  <td className="border border-black px-1.5 py-[2px] text-center">GTI</td>
+                  <td className="border border-black px-1.5 py-[2px] text-center">{displayHorario}</td>
+                  <td className="border border-black px-1.5 py-[2px]">{linha.descricao}</td>
+                  <td className="border border-black px-1.5 py-[2px] text-center font-bold">{motoristaDoDia}</td>
+                  <td className="border border-black px-1.5 py-[2px] text-center"></td>
+                  <td className="border border-black px-1.5 py-[2px] text-center text-gray-500">{idx + 1}</td>
                 </tr>
               );
             })}
