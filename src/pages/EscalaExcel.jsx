@@ -27,7 +27,7 @@ const STATUS_CELL = {
 };
 
 // ─── Célula editável ───────────────────────────────────────────────────────────
-function EditableCell({ value, onChange, placeholder = '—', className = '' }) {
+function EditableCell({ value, onChange, placeholder = '—', className = '', listId }) {
   const [editing, setEditing] = useState(false);
   const [val, setVal] = useState(value || '');
   const inputRef = useRef(null);
@@ -46,6 +46,7 @@ function EditableCell({ value, onChange, placeholder = '—', className = '' }) 
         onChange={e => setVal(e.target.value)}
         onBlur={commit}
         onKeyDown={e => { if (e.key === 'Enter') commit(); if (e.key === 'Escape') { setVal(value||''); setEditing(false); } }}
+        list={listId}
         className="w-full bg-blue-500/20 border border-blue-400 text-white text-xs px-1.5 py-1 rounded outline-none min-w-16"
       />
     );
@@ -101,7 +102,7 @@ function LinhaRow({ linha, days, drivers, selYear, selMonth, todayDay, isCurrent
         <EditableCell value={linha.descricao || linha.lineCode} onChange={v => onUpdate(linha.id, { descricao: v })} placeholder="Descrição da linha" />
       </td>
       <td className="border-r border-slate-700/50 px-2 py-1.5 min-w-[110px]">
-        <EditableCell value={linha.motoristaTitularName} onChange={v => onUpdate(linha.id, { motoristaTitularName: v })} placeholder="Titular" />
+        <EditableCell value={linha.motoristaTitularName} onChange={v => onUpdate(linha.id, { motoristaTitularName: v })} placeholder="Titular" listId="motoristas-list" />
       </td>
 
       {/* Day cells */}
@@ -140,7 +141,7 @@ function LinhaRow({ linha, days, drivers, selYear, selMonth, todayDay, isCurrent
             {isBeforeCreation ? (
               <div className="text-center text-[10px] text-slate-600">—</div>
             ) : (
-              <EditableCell value={cellValue} onChange={v => setDia(d, v)} placeholder="—" />
+              <EditableCell value={cellValue} onChange={v => setDia(d, v)} placeholder="—" listId="motoristas-list" />
             )}
           </td>
         );
@@ -263,6 +264,11 @@ export default function EscalaExcel() {
 
   return (
     <div className="p-6 space-y-4">
+      {/* Autocomplete Datalist */}
+      <datalist id="motoristas-list">
+        {motoristasUnicos.map(m => <option key={m} value={m} />)}
+      </datalist>
+
       {/* Header */}
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
