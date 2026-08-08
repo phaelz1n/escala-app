@@ -682,9 +682,6 @@ export default function EscalaExcel() {
               }
 
               const motoristaDoDia = linha.dias?.[`d${printDay}`] || '';
-              // Hide empty rows logic in print if toggle is on
-              if (hideEmpty && !motoristaDoDia) return null;
-
               // Format time if it's >= 24h (e.g. 27:20 -> 03:20)
               let displayHorario = linha.horario;
               if (displayHorario) {
