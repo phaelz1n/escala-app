@@ -91,11 +91,15 @@ function HeaderMenu({ title, colKey, activeMenu, setActiveMenu, sortConfigs, set
   const uniqueValues = useMemo(() => {
     if (!isOpen) return [];
     const vals = new Set();
+    let hasEmpty = false;
     linhas.forEach(l => {
       const v = getVal(l);
       if (v) vals.add(v);
+      else hasEmpty = true;
     });
-    return Array.from(vals).sort((a, b) => (String(a)).localeCompare(String(b)));
+    const arr = Array.from(vals).sort((a, b) => (String(a)).localeCompare(String(b)));
+    if (hasEmpty) arr.push(''); // Add empty representation at the end
+    return arr;
   }, [isOpen, linhas, getVal]);
 
   const sortIndex = sortConfigs.findIndex(s => s.key === colKey);
@@ -168,7 +172,7 @@ function HeaderMenu({ title, colKey, activeMenu, setActiveMenu, sortConfigs, set
             {filteredValues.map(val => (
               <label key={val} className="flex items-center gap-2 px-2 py-1 hover:bg-slate-700 rounded cursor-pointer text-xs">
                 <input type="checkbox" checked={selectedValues.length === 0 || selectedValues.includes(val)} onChange={() => toggleValue(val)} className="rounded bg-slate-700 border-slate-600 text-blue-500" />
-                <span className="truncate">{val}</span>
+                <span className="truncate">{val || '(Vazios)'}</span>
               </label>
             ))}
           </div>
@@ -275,7 +279,6 @@ export default function EscalaExcel() {
   const [selMonth, setSelMonth] = useState(now.getMonth());
   const [selYear,  setSelYear]  = useState(now.getFullYear());
   const [searchDesc, setSearchDesc] = useState('');
-  const [hideEmpty, setHideEmpty] = useState(false);
   const [printDay, setPrintDay] = useState(todayDay);
   
   const [filterTurno, setFilterTurno] = useState('');
@@ -363,10 +366,6 @@ export default function EscalaExcel() {
       
       // 3. Turno
       if (filterTurno && l.turno !== filterTurno) return false;
-      
-      // 4. Hide Empty (oculta se não tem motorista titular, ou no print pode ter lógica especial, mas a UI quer esconder se a linha em si não tem)
-      // Ocultar Sem Motorista: Se ativado, esconde as linhas que não tem titular.
-      if (hideEmpty && !l.motoristaTitularName) return false;
 
       return true;
     }).sort((a, b) => {
@@ -401,12 +400,12 @@ export default function EscalaExcel() {
       }
       return 0; // They are equal on all sorted columns
     });
-  }, [linhas, columnFilters, searchDesc, filterTurno, hideEmpty, selMonth, selYear, sortConfigs]);
+  }, [linhas, columnFilters, searchDesc, filterTurno, selMonth, selYear, sortConfigs]);
 
   // Reset pagination when filters change
   useEffect(() => {
     setCurrentPage(1);
-  }, [columnFilters, searchDesc, filterTurno, hideEmpty, selMonth, selYear, sortConfigs]);
+  }, [columnFilters, searchDesc, filterTurno, selMonth, selYear, sortConfigs]);
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / itemsPerPage));
   const paginated = filtered.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
@@ -483,11 +482,6 @@ export default function EscalaExcel() {
               placeholder="Buscar descrição..."
               className="bg-transparent text-slate-200 text-sm outline-none w-full placeholder:text-slate-500" />
           </div>
-          
-          <label className="flex items-center gap-2 text-slate-300 text-sm cursor-pointer bg-slate-800/60 border border-slate-700/50 rounded-xl px-3 py-2">
-            <input type="checkbox" checked={hideEmpty} onChange={e => setHideEmpty(e.target.checked)} className="rounded bg-slate-700 border-slate-600 text-blue-500"/>
-            Ocultar Sem Motorista
-          </label>
         </div>
         <select
           value={filterTurno}
