@@ -43,7 +43,7 @@ function LeaveCard({ leave, onCancel, onApplySubstitute }) {
                 </p>
                 <p className="text-emerald-400 text-xs mt-0.5 flex items-center gap-1">
                   <UserCheck size={12}/> {s.substitute?.name}
-                  <span className="text-slate-500 ml-1">({s.substitute?.categoria})</span>
+                  <span className="text-slate-500 ml-1">({s.substitute?.categoria}{s.substitute?.turno ? ` · ${s.substitute?.turno}` : ''})</span>
                 </p>
               </div>
               <button

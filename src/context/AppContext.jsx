@@ -185,13 +185,15 @@ export function AppProvider({ children, user }) {
   }, [updateLinha, addAlert]);
 
   // ── Sugestão de substituto ────────────────────────────────────────────────
-  const suggestSubstitute = useCallback((driverName, horario) => {
+  const suggestSubstitute = useCallback((driverName, horario, linhaTurno) => {
+    // Basic recommendation: find active reserve not scheduled at the same time and matching the shift (turno)
     const scheduledNow = linhas
       .filter(s => s.motoristaTitularName !== driverName && s.horario === horario)
       .map(s => s.motoristaTitularName);
     return drivers.find(
       d => d.categoria === 'Reserva' &&
            d.status === 'Ativo' &&
+           (!linhaTurno || !d.turno || d.turno === linhaTurno) &&
            !scheduledNow.includes(d.name) &&
            d.name !== driverName
     ) || null;
@@ -209,7 +211,7 @@ export function AppProvider({ children, user }) {
     // Affected lines
     const affected = linhas.filter(s => s.motoristaTitularName === driverName);
     const suggestions = affected.map(s => {
-      const sub = suggestSubstitute(driverName, s.horario);
+      const sub = suggestSubstitute(driverName, s.horario, s.turno);
       return { schedule: s, substitute: sub };
     }).filter(x => x.substitute);
 

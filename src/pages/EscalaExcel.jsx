@@ -65,8 +65,8 @@ function EditableCell({ value, onChange, placeholder = '—', className = '', li
   );
 }
 
-// ─── Linha da tabela ───────────────────────────────────────────────────────────
-function LinhaRow({ linha, days, drivers, selYear, selMonth, todayDay, isCurrentMonth, onUpdate, onDelete }) {
+// ─── Linha Table Row ─────────────────────────────────────────────────────────────
+function LinhaRow({ linha, days, selYear, selMonth, todayDay, isCurrentMonth, onUpdate, onDelete, atestadosSet }) {
   const [confirmDelete, setConfirmDelete] = useState(false);
 
   // driver cells: each day-slot has a motorista key like `dia_1`, `dia_2`, etc.
@@ -127,8 +127,12 @@ function LinhaRow({ linha, days, drivers, selYear, selMonth, todayDay, isCurrent
         }
 
         const isOff = !isBeforeCreation && (!cellValue.trim() || ['x', 'folga', 'não roda', 'nao roda'].includes(cellValue.trim().toLowerCase()));
+        
+        const cellValueUpper = (cellValue || '').toUpperCase().trim();
+        const isAtestado = atestadosSet && cellValueUpper ? atestadosSet.has(`${cellValueUpper}_${d}`) : false;
 
         if (isBeforeCreation) bgClass = 'bg-slate-800/40 text-slate-600 cursor-not-allowed'; // Inactive style
+        else if (isAtestado) bgClass = 'bg-orange-500/20 text-orange-300 font-bold border border-orange-500/50';
         else if (isOff) bgClass = 'bg-red-500/20 text-red-300';
         else if (isToday) bgClass = 'bg-blue-500/5';
         else if (isWeekend) bgClass = 'bg-slate-800/80';
@@ -151,7 +155,7 @@ function LinhaRow({ linha, days, drivers, selYear, selMonth, todayDay, isCurrent
 }
 
 export default function EscalaExcel() {
-  const { linhas, drivers, updateLinha, addLinha, deleteLinha } = useApp();
+  const { linhas, drivers, atestados, updateLinha, addLinha, deleteLinha } = useApp();
 
   const now = new Date();
   const todayDay = now.getDate();
@@ -164,6 +168,7 @@ export default function EscalaExcel() {
   const [printDay, setPrintDay] = useState(todayDay);
   
   const [filterTurno, setFilterTurno] = useState('');
+  const [sortBy, setSortBy]           = useState('horario');
   const [showAddRow, setShowAddRow]   = useState(false);
   const [newLinha, setNewLinha] = useState({ empresa: '', horario: '', descricao: '', turno: 'Noite', pontoInicio: 'Garagem' });
 
@@ -178,6 +183,24 @@ export default function EscalaExcel() {
   const days = useMemo(() => Array.from({ length: daysInMonth }, (_, i) => i + 1), [daysInMonth]);
 
   const isCurrentMonth = now.getMonth() === selMonth && now.getFullYear() === selYear;
+
+  // Calculate medical leaves lookup map
+  const atestadosSet = useMemo(() => {
+    const set = new Set();
+    if (!atestados) return set;
+    atestados.forEach(a => {
+      if (!a.startDate || !a.endDate || !a.driverName) return;
+      const start = new Date(a.startDate + 'T00:00:00');
+      const end = new Date(a.endDate + 'T23:59:59');
+      for (let d = 1; d <= daysInMonth; d++) {
+        const dateObj = new Date(selYear, selMonth, d);
+        if (dateObj >= start && dateObj <= end) {
+          set.add(`${a.driverName.toUpperCase().trim()}_${d}`);
+        }
+      }
+    });
+    return set;
+  }, [atestados, selMonth, selYear, daysInMonth]);
 
   // Extract unique companies and drivers for filters
   const empresasUnicas = useMemo(() => {
@@ -221,6 +244,16 @@ export default function EscalaExcel() {
 
       return true;
     }).sort((a, b) => {
+      if (sortBy === 'empresa') {
+        return (a.empresa || '').localeCompare(b.empresa || '');
+      }
+      if (sortBy === 'motorista') {
+        return (a.motoristaTitularName || '').localeCompare(b.motoristaTitularName || '');
+      }
+      if (sortBy === 'descricao') {
+        return (a.descricao || a.lineCode || '').localeCompare(b.descricao || b.lineCode || '');
+      }
+      // default: horario
       const getVal = (t) => {
         if (!t) return 0;
         let [h, m] = t.split(':').map(Number);
@@ -230,12 +263,12 @@ export default function EscalaExcel() {
       };
       return getVal(a.horario) - getVal(b.horario);
     });
-  }, [linhas, filterEmpresa, filterMotorista, searchDesc, filterTurno, hideEmpty, selMonth, selYear]);
+  }, [linhas, filterEmpresa, filterMotorista, searchDesc, filterTurno, hideEmpty, selMonth, selYear, sortBy]);
 
   // Reset pagination when filters change
   useEffect(() => {
     setCurrentPage(1);
-  }, [filterEmpresa, filterMotorista, searchDesc, filterTurno, hideEmpty, selMonth, selYear]);
+  }, [filterEmpresa, filterMotorista, searchDesc, filterTurno, hideEmpty, selMonth, selYear, sortBy]);
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / itemsPerPage));
   const paginated = filtered.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
@@ -341,6 +374,20 @@ export default function EscalaExcel() {
           {TURNOS.map(t => <option key={t}>{t}</option>)}
         </select>
 
+        <div className="flex items-center gap-2 bg-slate-800/60 border border-slate-700/50 rounded-xl px-3 py-1">
+          <span className="text-slate-400 text-xs font-medium">Ordenar por:</span>
+          <select
+            value={sortBy}
+            onChange={e => setSortBy(e.target.value)}
+            className="bg-transparent text-slate-200 text-sm outline-none font-medium py-1"
+          >
+            <option value="horario">Horário</option>
+            <option value="empresa">Empresa</option>
+            <option value="motorista">Motorista Titular</option>
+            <option value="descricao">Descrição / Linha</option>
+          </select>
+        </div>
+
         <span className="text-slate-500 text-xs ml-auto">{filtered.length} linhas</span>
       </div>
 
@@ -437,6 +484,7 @@ export default function EscalaExcel() {
                   isCurrentMonth={isCurrentMonth}
                   onUpdate={updateLinha}
                   onDelete={deleteLinha}
+                  atestadosSet={atestadosSet}
                 />
               ))}
               {paginated.length === 0 && (

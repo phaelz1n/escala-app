@@ -9,6 +9,7 @@ import {
 
 const CATEGORIAS = ['Titular', 'Reserva', 'Ferista', 'Horista 6h', 'Horista 4h'];
 const STATUS_LIST = ['Ativo', 'Férias', 'Atestado', 'Folga', 'Inativo'];
+const TURNOS = ['Manhã', 'Tarde', 'Noite', 'Madrugada'];
 
 const categoriaColors = {
   Titular:     'bg-blue-500/20 text-blue-300 border-blue-500/30',
@@ -26,11 +27,11 @@ const statusConfig = {
   Inativo:  { badge: 'bg-red-500/10 text-red-400 border-red-500/20',            icon: <UserX size={11}/> },
 };
 
-const emptyForm = { name: '', phone: '', categoria: 'Titular', status: 'Ativo' };
+const emptyForm = { name: '', phone: '', categoria: 'Titular', status: 'Ativo', turno: 'Manhã' };
 
 function DriverModal({ driver, onSave, onClose }) {
   const [form, setForm] = useState(driver ? {
-    name: driver.name, phone: driver.phone, categoria: driver.categoria, status: driver.status
+    name: driver.name, phone: driver.phone, categoria: driver.categoria, status: driver.status, turno: driver.turno || 'Manhã'
   } : emptyForm);
 
   return (
@@ -69,6 +70,15 @@ function DriverModal({ driver, onSave, onClose }) {
               </select>
             </div>
           </div>
+          {form.categoria === 'Reserva' && (
+            <div>
+              <label className="text-slate-400 text-xs font-medium block mb-1.5">Turno de Atuação *</label>
+              <select value={form.turno} onChange={e => setForm(p=>({...p, turno: e.target.value}))}
+                className="w-full bg-slate-700/50 border border-slate-600/50 text-slate-200 text-sm rounded-xl px-3 py-2.5 outline-none focus:border-blue-500/60 transition-colors">
+                {TURNOS.map(t => <option key={t} value={t}>{t}</option>)}
+              </select>
+            </div>
+          )}
           <div className="flex gap-3 pt-2">
             <button type="button" onClick={onClose}
               className="flex-1 py-2.5 bg-slate-700 hover:bg-slate-600 text-slate-300 text-sm font-medium rounded-xl transition-colors">
