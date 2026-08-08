@@ -186,9 +186,12 @@ export default function EscalaExcel() {
   }, [linhas]);
 
   const motoristasUnicos = useMemo(() => {
-    const list = Array.from(new Set(drivers.map(d => d.name).filter(Boolean)));
-    return list.sort();
-  }, [drivers]);
+    const fromDrivers = drivers.map(d => d.name).filter(Boolean);
+    const fromTitulares = linhas.map(l => l.motoristaTitularName).filter(Boolean);
+    const fromDias = linhas.flatMap(l => Object.values(l.dias || {})).filter(Boolean);
+    const all = new Set([...fromDrivers, ...fromTitulares, ...fromDias]);
+    return Array.from(all).sort();
+  }, [drivers, linhas]);
 
   const filtered = useMemo(() => {
     return linhas.filter(l => {
@@ -217,7 +220,16 @@ export default function EscalaExcel() {
       if (hideEmpty && !l.motoristaTitularName) return false;
 
       return true;
-    }).sort((a, b) => (a.horario || '').localeCompare(b.horario || ''));
+    }).sort((a, b) => {
+      const getVal = (t) => {
+        if (!t) return 0;
+        let [h, m] = t.split(':').map(Number);
+        if (isNaN(h)) return 0;
+        if (h < 3 || (h === 3 && m === 0)) h += 24; // Treat 00:00 to 03:00 as the end of the day
+        return h * 60 + (m || 0);
+      };
+      return getVal(a.horario) - getVal(b.horario);
+    });
   }, [linhas, filterEmpresa, filterMotorista, searchDesc, filterTurno, hideEmpty, selMonth, selYear]);
 
   // Reset pagination when filters change
